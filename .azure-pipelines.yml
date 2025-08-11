@@ -91,7 +91,6 @@ stages:
       - task: npmAuthenticate@0
         displayName: NPM Authentication
         inputs:
-          workingFile: '$(Agent.TempDirectory)/.npmrc'
           artifactFeeds: $(FEED_NAME)
 
       - task: Npm@1
@@ -110,6 +109,4 @@ stages:
         inputs:
           command: publish
           publishRegistry: useFeed
-          publishFeed: $(FEED_NAME)
-        env:
-          NPM_CONFIG_USERCONFIG: '$(Agent.TempDirectory)/.npmrc'          
+          publishFeed: $(FEED_NAME)       
