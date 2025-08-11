@@ -1,50 +1,49 @@
-# azure-pipelines.yml
-# Source: GitHub
-# Purpose: CI -> build/test -> publish to Azure Artifacts (Azure Feeds)
+# .azure-pipelines.yml (clean, block-style)
 
-# --- Triggers (adjust as needed) ---
 trigger:
-  branches: { include: [ main ] }
-  paths:    { exclude: [ 'docs/*', '**/*.md' ] }
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - docs/*
+      - '**/*.md'
 
 pr:
-  branches: { include: [ main ] }
+  branches:
+    include:
+      - main
 
-# --- Parameters ---
 parameters:
-  - name: packageType
-    displayName: Package type
-    type: string
-    default: npm
-    values: [ npm, nuget, maven ]
+- name: packageType
+  type: string
+  default: npm
+  values: [npm, nuget, maven]
 
-  - name: feedName
-    displayName: Azure Artifacts feed name
-    type: string
-    default: my-internal-feed
+- name: feedName
+  type: string
+  default: my-internal-feed
 
-  - name: dotnetVersion
-    type: string
-    default: '8.0.x'
+- name: dotnetVersion
+  type: string
+  default: '8.0.x'
 
-  - name: nodeVersion
-    type: string
-    default: '20.x'
+- name: nodeVersion
+  type: string
+  default: '20.x'
 
-  - name: mavenPomFile
-    type: string
-    default: 'pom.xml'
+- name: mavenPomFile
+  type: string
+  default: 'pom.xml'
 
-# --- Variables ---
 variables:
   BuildConfiguration: Release
   FEED_NAME: ${{ parameters.feedName }}
 
-# Optional: predictable build numbers (e.g., 20250811.1)
 name: $(Date:yyyyMMdd)$(Rev:.r)
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: ubuntu-latest
 
 stages:
 - stage: validate
@@ -54,20 +53,23 @@ stages:
     steps:
     - ${{ if eq(parameters.packageType, 'npm') }}:
       - task: NodeTool@0
-        inputs: { versionSpec: ${{ parameters.nodeVersion }} }
+        inputs:
+          versionSpec: ${{ parameters.nodeVersion }}
       - task: Npm@1
         displayName: npm ci
         inputs:
-          command: 'ci'
+          command: ci
       - task: Npm@1
         displayName: npm test
         inputs:
-          command: 'custom'
-          customCommand: 'test --if-present'
+          command: custom
+          customCommand: test --if-present
 
     - ${{ if eq(parameters.packageType, 'nuget') }}:
       - task: UseDotNet@2
-        inputs: { packageType: 'sdk', version: ${{ parameters.dotnetVersion }} }
+        inputs:
+          packageType: sdk
+          version: ${{ parameters.dotnetVersion }}
       - task: NuGetAuthenticate@1
       - script: dotnet restore
         displayName: dotnet restore
@@ -78,18 +80,18 @@ stages:
 
     - ${{ if eq(parameters.packageType, 'maven') }}:
       - task: MavenAuthenticate@0
+        displayName: Configure Maven credentials
         inputs:
           artifactsFeeds: $(FEED_NAME)
-        displayName: Configure Maven credentials
       - task: Maven@3
-        displayName: mvn - clean verify (tests)
+        displayName: mvn clean verify
         inputs:
           mavenPomFile: ${{ parameters.mavenPomFile }}
-          goals: 'clean verify'
-          options: '-B'
-          javaHomeOption: 'JDKVersion'
-          jdkVersionOption: '1.17'
-          mavenOptions: '-Xmx1g'
+          goals: clean verify
+          options: -B
+          javaHomeOption: JDKVersion
+          jdkVersionOption: 1.17
+          mavenOptions: -Xmx1g
           publishJUnitResults: true
           testResultsFiles: '**/surefire-reports/TEST-*.xml'
 
@@ -100,63 +102,61 @@ stages:
   jobs:
   - job: publish
     steps:
-    # --- NPM ---
+    # NPM
     - ${{ if eq(parameters.packageType, 'npm') }}:
       - task: NodeTool@0
-        inputs: { versionSpec: ${{ parameters.nodeVersion }} }
-      # Auth to Azure Artifacts feed (adds token to ~/.npmrc)
-      - task: npmAuthenticate@0
         inputs:
-          workingFile: ''
-          customEndpoint: ''
-          # Simplest: reference the feed by name
-          # If you use multiple registries/scopes, check in a .npmrc and point workingFile to it.
-          # Or switch to "artifactFeeds" input:
-          # artifactFeeds: $(FEED_NAME)
+          versionSpec: ${{ parameters.nodeVersion }}
+      - task: npmAuthenticate@0
+        displayName: Authenticate to Azure Artifacts
+        inputs:
+          artifactFeeds: $(FEED_NAME)
       - task: Npm@1
         displayName: npm version (CI build metadata)
         inputs:
-          command: 'custom'
-          customCommand: 'version --no-git-tag-version $(Build.BuildNumber)'
+          command: custom
+          customCommand: version --no-git-tag-version $(Build.BuildNumber)
       - task: Npm@1
         displayName: npm pack
         inputs:
-          command: 'custom'
-          customCommand: 'pack'
+          command: custom
+          customCommand: pack
       - task: Npm@1
         displayName: npm publish -> Azure Artifacts
         inputs:
-          command: 'publish'
+          command: publish
           publishRegistry: useFeed
           publishFeed: $(FEED_NAME)
 
-    # --- NuGet (.NET) ---
+    # NuGet
     - ${{ if eq(parameters.packageType, 'nuget') }}:
       - task: UseDotNet@2
-        inputs: { packageType: 'sdk', version: ${{ parameters.dotnetVersion }} }
+        inputs:
+          packageType: sdk
+          version: ${{ parameters.dotnetVersion }}
       - task: NuGetAuthenticate@1
       - script: dotnet pack -c $(BuildConfiguration) -o $(Build.ArtifactStagingDirectory) /p:PackageVersion=$(Build.BuildNumber)
         displayName: dotnet pack
       - task: NuGetCommand@2
         displayName: nuget push -> Azure Artifacts
         inputs:
-          command: 'push'
+          command: push
           packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!**/*.symbols.nupkg'
           publishVstsFeed: $(FEED_NAME)
           allowPackageConflicts: false
 
-    # --- Maven ---
+    # Maven
     - ${{ if eq(parameters.packageType, 'maven') }}:
       - task: MavenAuthenticate@0
+        displayName: Configure Maven credentials
         inputs:
           artifactsFeeds: $(FEED_NAME)
-        displayName: Configure Maven credentials
       - task: Maven@3
-        displayName: mvn - deploy -> Azure Artifacts
+        displayName: mvn deploy -> Azure Artifacts
         inputs:
           mavenPomFile: ${{ parameters.mavenPomFile }}
-          goals: 'clean deploy -DskipTests'
+          goals: clean deploy -DskipTests
           options: '-B -Drevision=$(Build.BuildNumber)'
-          javaHomeOption: 'JDKVersion'
-          jdkVersionOption: '1.17'
-          mavenOptions: '-Xmx1g'
+          javaHomeOption: JDKVersion
+          jdkVersionOption: 1.17
+          mavenOptions: -Xmx1g
