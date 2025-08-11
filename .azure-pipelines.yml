@@ -107,6 +107,13 @@ stages:
       - task: NodeTool@0
         inputs:
           versionSpec: ${{ parameters.nodeVersion }}
+      
+      - task: PowerShell@2
+        displayName: 'list files and folders'
+        inputs:
+          targetType: 'inline'
+          script: |
+            Get-ChildItem -Recurse | Select-Object FullName
 
       - task: npmAuthenticate@0
         displayName: NPM Authentication
