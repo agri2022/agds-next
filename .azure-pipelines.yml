@@ -39,6 +39,7 @@ parameters:
 variables:
   BuildConfiguration: Release
   FEED_NAME: ${{ parameters.feedName }}
+  BaseVersion: '1.0.0'
 
 name: $(Date:yyyyMMdd)$(Rev:.r)
 
@@ -122,10 +123,11 @@ stages:
           artifactFeeds: $(FEED_NAME)
 
       - task: Npm@1
-        displayName: npm version (CI build metadata)
+        displayName: Set CI version
         inputs:
           command: custom
-          customCommand: version --no-git-tag-version $(Build.BuildNumber)
+          customCommand: 'version $(BaseVersion)-$(Build.BuildId) --no-git-tag-version'
+          
       - task: Npm@1
         displayName: npm pack
         inputs:
