@@ -107,10 +107,13 @@ stages:
       - task: NodeTool@0
         inputs:
           versionSpec: ${{ parameters.nodeVersion }}
+
       - task: npmAuthenticate@0
-        displayName: Authenticate to Azure Artifacts
+        displayName: NPM Authentication
         inputs:
+          workingFile: .npmrc
           artifactFeeds: $(FEED_NAME)
+
       - task: Npm@1
         displayName: npm version (CI build metadata)
         inputs:
