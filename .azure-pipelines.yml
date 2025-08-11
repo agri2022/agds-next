@@ -14,17 +14,8 @@ pr:
     include:
       - main
 
-parameters:
-- name: feedName
-  type: string
-  default: ECM
-
-- name: nodeVersion
-  type: string
-  default: '20.x'
-
 variables:
-  FEED_NAME: ${{ parameters.feedName }}
+  FEED_NAME: 'ECM'
   BaseVersion: '1.0.0'
 
 name: $(Date:yyyyMMdd)$(Rev:.r)
@@ -40,7 +31,7 @@ stages:
     steps:
       - task: NodeTool@0
         inputs:
-          versionSpec: ${{ parameters.nodeVersion }}
+          versionSpec: '20.x'
       - task: Npm@1
         displayName: npm ci
         inputs:
@@ -82,7 +73,7 @@ stages:
 
       - task: NodeTool@0
         inputs:
-          versionSpec: ${{ parameters.nodeVersion }}
+          versionSpec: '20.x'
       
       - task: PowerShell@2
         displayName: 'list files and folders'
