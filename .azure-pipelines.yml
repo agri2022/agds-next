@@ -17,7 +17,7 @@ pr:
 parameters:
 - name: feedName
   type: string
-  default: ECM-UI-Feed
+  default: ECM
 
 - name: nodeVersion
   type: string
