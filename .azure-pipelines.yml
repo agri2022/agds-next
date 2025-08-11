@@ -15,29 +15,15 @@ pr:
       - main
 
 parameters:
-- name: packageType
-  type: string
-  default: npm
-  values: [npm, nuget, maven]
-
 - name: feedName
   type: string
-  default: my-internal-feed
-
-- name: dotnetVersion
-  type: string
-  default: '8.0.x'
+  default: ECM-UI-Feed
 
 - name: nodeVersion
   type: string
   default: '20.x'
 
-- name: mavenPomFile
-  type: string
-  default: 'pom.xml'
-
 variables:
-  BuildConfiguration: Release
   FEED_NAME: ${{ parameters.feedName }}
   BaseVersion: '1.0.0'
 
@@ -52,7 +38,6 @@ stages:
   jobs:
   - job: test
     steps:
-    - ${{ if eq(parameters.packageType, 'npm') }}:
       - task: NodeTool@0
         inputs:
           versionSpec: ${{ parameters.nodeVersion }}
@@ -66,36 +51,6 @@ stages:
           command: custom
           customCommand: test --if-present
 
-    - ${{ if eq(parameters.packageType, 'nuget') }}:
-      - task: UseDotNet@2
-        inputs:
-          packageType: sdk
-          version: ${{ parameters.dotnetVersion }}
-      - task: NuGetAuthenticate@1
-      - script: dotnet restore
-        displayName: dotnet restore
-      - script: dotnet build -c $(BuildConfiguration) --no-restore
-        displayName: dotnet build
-      - script: dotnet test -c $(BuildConfiguration) --no-build --nologo
-        displayName: dotnet test
-
-    - ${{ if eq(parameters.packageType, 'maven') }}:
-      - task: MavenAuthenticate@0
-        displayName: Configure Maven credentials
-        inputs:
-          artifactsFeeds: $(FEED_NAME)
-      - task: Maven@3
-        displayName: mvn clean verify
-        inputs:
-          mavenPomFile: ${{ parameters.mavenPomFile }}
-          goals: clean verify
-          options: -B
-          javaHomeOption: JDKVersion
-          jdkVersionOption: 1.17
-          mavenOptions: -Xmx1g
-          publishJUnitResults: true
-          testResultsFiles: '**/surefire-reports/TEST-*.xml'
-
 - stage: package_and_publish
   displayName: Package & Publish to Azure Artifacts
   dependsOn: validate
@@ -103,8 +58,6 @@ stages:
   jobs:
   - job: publish
     steps:
-    # NPM
-    - ${{ if eq(parameters.packageType, 'npm') }}:
       - task: NodeTool@0
         inputs:
           versionSpec: ${{ parameters.nodeVersion }}
@@ -139,36 +92,3 @@ stages:
           command: publish
           publishRegistry: useFeed
           publishFeed: $(FEED_NAME)
-
-    # NuGet
-    - ${{ if eq(parameters.packageType, 'nuget') }}:
-      - task: UseDotNet@2
-        inputs:
-          packageType: sdk
-          version: ${{ parameters.dotnetVersion }}
-      - task: NuGetAuthenticate@1
-      - script: dotnet pack -c $(BuildConfiguration) -o $(Build.ArtifactStagingDirectory) /p:PackageVersion=$(Build.BuildNumber)
-        displayName: dotnet pack
-      - task: NuGetCommand@2
-        displayName: nuget push -> Azure Artifacts
-        inputs:
-          command: push
-          packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!**/*.symbols.nupkg'
-          publishVstsFeed: $(FEED_NAME)
-          allowPackageConflicts: false
-
-    # Maven
-    - ${{ if eq(parameters.packageType, 'maven') }}:
-      - task: MavenAuthenticate@0
-        displayName: Configure Maven credentials
-        inputs:
-          artifactsFeeds: $(FEED_NAME)
-      - task: Maven@3
-        displayName: mvn deploy -> Azure Artifacts
-        inputs:
-          mavenPomFile: ${{ parameters.mavenPomFile }}
-          goals: clean deploy -DskipTests
-          options: '-B -Drevision=$(Build.BuildNumber)'
-          javaHomeOption: JDKVersion
-          jdkVersionOption: 1.17
-          mavenOptions: -Xmx1g
