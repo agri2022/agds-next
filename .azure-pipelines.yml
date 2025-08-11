@@ -14,8 +14,13 @@ pr:
     include:
       - main
 
+parameters:
+  - name: feed
+    type: string
+    default: 'Provide feed name'
+
 variables:
-  FEED_NAME: 'ECM'
+  FEED_NAME: ${{ parameters.feed }}
   BaseVersion: '1.0.0'
   SOURCE_BRANCH: $[replace(variables['Build.SourceBranch'], 'refs/heads/', '')]
 
